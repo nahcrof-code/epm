@@ -4,3 +4,7 @@ the purpose of epm is to allow for nahcrof modules and projects to be easily upd
 
 ## Installing epm
 
+To start, it is important to realize that currently epm will only properly install on linux devices.<br>
+<br>
+To install epm, please install "install_epm.py" and run ```python3 install_epm.py public```
+This will allow you to run epm commands.
