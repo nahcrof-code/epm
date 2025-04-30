@@ -35,6 +35,8 @@ def download_epm(dest_path: Path, password: str):
             out.write(resp.read())
     except urllib.error.HTTPError as e:
         print(f"Error: HTTP {e.code} {e.reason}", file=sys.stderr)
+        print(password)
+        print(dest_path)
         sys.exit(1)
     except Exception as e:
         print(f"Download failed: {e}", file=sys.stderr)
