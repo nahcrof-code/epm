@@ -14,29 +14,29 @@ import sys
 import stat
 import shutil
 import tempfile
-import urllib.request
-import urllib.error
 import argparse
 from pathlib import Path
+
+import requests
 
 BASE_URL = "https://epm.nahcrof.com/install/epm.py"
 EXPORT_MARK = "# added by install_epm.py"
 
 
 def download_epm(dest_path: Path, password: str):
-    url = f"{BASE_URL}?password={password}"
-    print(f"Downloading {url} → {dest_path}")
+    url = BASE_URL
+    params = {"password": password}
+    print(f"Downloading {url}?password=•••• → {dest_path}")
     try:
-        with urllib.request.urlopen(url) as resp, open(dest_path, "wb") as out:
-            if resp.status != 200:
-                raise urllib.error.HTTPError(
-                    url, resp.status, resp.reason, resp.headers, None
-                )
-            out.write(resp.read())
-    except urllib.error.HTTPError as e:
-        print(f"Error: HTTP {e.code} {e.reason}", file=sys.stderr)
-        print(password)
-        print(dest_path)
+        resp = requests.get(url, params=params, stream=True, timeout=10)
+        resp.raise_for_status()
+        with open(dest_path, "wb") as out:
+            for chunk in resp.iter_content(chunk_size=8192):
+                out.write(chunk)
+    except requests.exceptions.HTTPError as e:
+        code = e.response.status_code
+        reason = e.response.reason if hasattr(e.response, "reason") else ""
+        print(f"Error: HTTP {code} {reason}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
         print(f"Download failed: {e}", file=sys.stderr)
@@ -127,29 +127,26 @@ def install(password: str):
         # ----------------------------------------------------------------
         # Create a small 'root wrapper' so that `sudo epm ...` still works.
         # ----------------------------------------------------------------
-        # We install /usr/local/bin/epm (must be writable via sudo) as a tiny
-        # shell script that execs the real ~/.local/bin/epm with all args.
         wrapper_path = Path("/usr/local/bin/epm")
-        real_epm = target_path  # e.g. /home/alice/.local/bin/epm
+        real_epm = target_path
         wrapper_sh = f"""#!/usr/bin/env bash
 exec "{real_epm}" "$@"
 """
         try:
-            # echo wrapper_sh | sudo tee /usr/local/bin/epm >/dev/null
-            proc = __import__("subprocess").run(
+            import subprocess
+
+            subprocess.run(
                 ["sudo", "tee", str(wrapper_path)],
                 input=wrapper_sh.encode(),
-                stdout=__import__("subprocess").DEVNULL,
+                stdout=subprocess.DEVNULL,
                 check=True,
             )
-            __import__("subprocess").run(
+            subprocess.run(
                 ["sudo", "chmod", "+x", str(wrapper_path)], check=True
             )
             print(f"Installed sudo‐wrapper → {wrapper_path}")
         except Exception as e:
-            print(
-                "Warning: could not write root‐wrapper:", e, file=sys.stderr
-            )
+            print("Warning: could not write root‐wrapper:", e, file=sys.stderr)
         # ----------------------------------------------------------------
     print("Done.")
 
@@ -190,5 +187,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
